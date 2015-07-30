@@ -1,0 +1,60 @@
+---
+- hosts: consul
+  remote_user: ubuntu
+  sudo: yes
+
+  tasks:
+  - name: Get ec2 facts
+    action: ec2_facts
+
+  - name: Set hostname
+    hostname: name=consul-server-{{ ansible_ec2_local_ipv4|replace('.', '-') }}
+
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=86400
+
+  - name: Install system packages
+    apt: name={{ item }}
+    with_items:
+      - unzip
+      - dnsmasq
+
+  - name: Download Consul
+    get_url:
+      url: https://dl.bintray.com/mitchellh/consul/0.3.1_linux_amd64.zip
+      dest: /tmp/consul.zip
+
+  - name: Download Consul UI
+    get_url:
+      url: https://dl.bintray.com/mitchellh/consul/0.3.1_web_ui.zip
+      dest: /tmp/consul-ui.zip
+
+  - name: Extract Consul
+    command: unzip -n -d /bin /tmp/consul.zip creates=/bin/consul
+
+  - name: Extract Consul UI
+    command: unzip -n -d /var/consul/ui /tmp/consul-ui.zip creates={{ consul_ui_dir }}
+
+  - name: Create Consul config folder
+    file: path={{ consul_config_dir }} state=directory
+
+  - name: Create Consul data dir
+    file: path={{ consul_data_dir }} mode=755 state=directory
+
+  - name: Create Consul config
+    template: src=templates/consul.json dest={{ consul_config_dir }}/consul.json
+
+  - name: Install consul-server upstart config
+    copy: src=files/consul-server.conf dest=/etc/init/consul-server.conf
+
+  - name: Enable consul-server service
+    service: name=consul-server enabled=yes state=started
+
+  - name: Configure Dnsmasq
+    copy: content='server=/consul/127.0.0.1#8600' dest=/etc/dnsmasq.d/10-consul
+    notify:
+      - restart dnsmasq
+
+  handlers:
+    - name: restart dnsmasq
+      service: name=dnsmasq state=restarted enabled=yes

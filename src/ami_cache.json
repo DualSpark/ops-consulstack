@@ -41,6 +41,24 @@
         "ubuntu1404LtsAmiId": "ami-ee4f77ab",
         "amazonLinuxAmiId": "ami-d114f295"
     },
+    "us-west-1a": {
+        "natAmiId": "ami-7850793d",
+        "centOS65AmiId": "ami-1a013c5f",
+        "ubuntu1404LtsAmiId": "ami-ee4f77ab",
+        "amazonLinuxAmiId": "ami-d114f295"
+    },
+    "us-west-1b": {
+        "natAmiId": "ami-7850793d",
+        "centOS65AmiId": "ami-1a013c5f",
+        "ubuntu1404LtsAmiId": "ami-ee4f77ab",
+        "amazonLinuxAmiId": "ami-d114f295"
+    },
+    "us-west-1c": {
+        "natAmiId": "ami-7850793d",
+        "centOS65AmiId": "ami-1a013c5f",
+        "ubuntu1404LtsAmiId": "ami-ee4f77ab",
+        "amazonLinuxAmiId": "ami-d114f295"
+    },
     "eu-central-1": {
         "amazonLinuxAmiId": "ami-a8221fb5"
     },
