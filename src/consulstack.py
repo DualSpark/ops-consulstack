@@ -18,6 +18,7 @@ Options:
 from environmentbase.networkbase import NetworkBase
 from environmentbase.cli import CLI
 from environmentbase.template import Template
+from environmentbase import template
 from troposphere import ec2, Tags, Ref, iam, GetAtt, Join, FindInMap, Output, Select
 from troposphere.ec2 import NetworkInterfaceProperty
 from troposphere.sqs import Queue
@@ -39,7 +40,7 @@ class ConsulTemplate(Template):
     # Load USER_DATA scripts from package
     # E_BOOTSTRAP_SH = resources.get_resource('elasticsearch_bootstrap.sh', __name__)
     # L_BOOTSTRAP_SH = resources.get_resource('logstash_bootstrap.sh', __name__)
-    # K_BOOTSTRAP_SH = resources.get_resource('kibana_bootstrap.sh', __name__)
+    BOOTSTRAP_SH = resources.get_resource('consul_bootstrap.sh', __name__)
 
     # default configuration values
     DEFAULT_CONFIG = {
@@ -48,13 +49,6 @@ class ConsulTemplate(Template):
         }
     }
 
-    # NETWORK_CONFIG = {
-    #     'network': {
-    #         'az_count': 3,
-    #         'public_subnet_count': 3,
-    #         'private_subnet_count': 3
-    #     }
-    # }
 
     # schema of expected types for config values
     CONFIG_SCHEMA = {
@@ -68,7 +62,6 @@ class ConsulTemplate(Template):
 
         }
     }
-
 
 
     # Collect all the values we need to assemble our ELK stack
@@ -97,7 +90,63 @@ class ConsulTemplate(Template):
         self.create_consul_cluster()
 
 
-#     def create_consul_cluster(self):
+    def create_consul_cluster(self):
+
+        #t_config = self.config.get('template')
+
+        consul_security_group = utils.create_security_group(
+            self, 'ConsulSecurityGroup', 'Enables internal access to Consul', self.vpc_id,
+            ingress=[
+                ec2.SecurityGroupRule(
+                    IpProtocol='tcp', CidrIp=utils.WILDCARD_CIDR, FromPort=p, ToPort=p
+                )
+                for p in [22, 53, 8400, 8500, 8600]
+            ] + [
+                ec2.SecurityGroupRule(
+                    IpProtocol=p, CidrIp=utils.WILDCARD_CIDR, FromPort=8300, ToPort=8302
+                )
+                for p in ['tcp', 'udp']
+            ] + [
+                ec2.SecurityGroupRule(
+                    IpProtocol='udp', CidrIp=utils.WILDCARD_CIDR, FromPort=p, ToPort=p
+                )
+                for p in [53, 8400, 8500, 8600]
+            ],
+            egress=[
+                ec2.SecurityGroupRule(
+                    IpProtocol='tcp', CidrIp=utils.WILDCARD_CIDR, FromPort=p, ToPort=p
+                )
+                for p in [53, 80, 443, 8400, 8500, 8600]
+            ] + [
+                ec2.SecurityGroupRule(
+                    IpProtocol=p, CidrIp=utils.WILDCARD_CIDR, FromPort=8300, ToPort=8302
+                )
+                for p in ['tcp', 'udp']
+            ] + [
+                ec2.SecurityGroupRule(
+                    IpProtocol='udp', CidrIp=utils.WILDCARD_CIDR, FromPort=p, ToPort=p
+                )
+                for p in [53, 8400, 8500, 8600]
+            ]
+        )
+        for index in range(len(self.azs)):
+            name = 'ConsulHost%s' % (index + 1)
+            print "Creating instance {0}".format(name)
+            #import pdb; pdb.set_trace()
+
+            consul_host = self.add_resource(ec2.Instance(
+                name,
+                InstanceType="m1.small",
+                AvailabilityZone = self.azs[index],
+                KeyName=Ref(self.parameters['ec2Key']),
+                ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.ami_id),
+                SecurityGroups=[Ref(consul_security_group)],
+                SubnetId=self.subnets['private'][index],
+                Tags=Tags(Name=name)
+
+            ))
+
+
 #
 #         vpc = Ref(self.vpc_id)
 #         #import pdb; pdb.set_trace()
@@ -280,7 +329,7 @@ class ConsulStackController(NetworkBase):
     """
     Coordinates CONSUL stack actions (create and deploy)
     """
-
+    #import pdb; pdb.set_trace()
     # When no config.json file exists a new one is created using the 'factory default' file.  This function
     # augments the factory default before it is written to file with the config values required by an ConsulTemplate
     @staticmethod
@@ -314,12 +363,12 @@ class ConsulStackController(NetworkBase):
 
         # # Load some settings from the config file
         #
-        # consul_config = self.config.get('consul')
-        # env_name = self.globals.get('environment_name', 'environmentbase-consul')
+        consul_config = self.config.get('consul')
+        env_name = self.globals.get('environment_name', 'environmentbase-consul')
         #
         #
         # # Create our ELK Template (defined above)
-        # consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
+        consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
         # #import pdb; pdb.set_trace()
         #
         # # Add the ELK template as a child of the top-level template
@@ -328,7 +377,7 @@ class ConsulStackController(NetworkBase):
         # # After parameters are added to the template it is serialized to file and uploaded to S3 (s3_utility_bucket).
         # # Finally a 'Stack' resource is added to the top-level template referencing the child template in S3 and
         # # assigning values to each of the input parameters.
-        # self.add_child_template(consul_template)
+        self.add_child_template(consul_template)
 
         # Serialize top-level template to file
         self.write_template_to_file()
