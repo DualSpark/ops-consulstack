@@ -106,13 +106,12 @@ class ConsulTemplate(Template):
                 InstanceType="m1.small",
                 KeyName=Ref(self.parameters['ec2Key']),
                 ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.ami_id),
-                SecurityGroups=[Ref(consul_security_group)],
+                #SecurityGroups=[Ref(consul_security_group)],
                 NetworkInterfaces=[
                     ec2.NetworkInterfaceProperty(
                         Description='ENI for CONSUL hosts',
                         GroupSet=[Ref(consul_security_group)],
-                        SubnetId=Ref(self.subnets['private'][index]),
-                        AssociatePublicIpAddress=True,
+                        SubnetId=self.subnets['private'][index],
                         DeviceIndex=0,
                         DeleteOnTermination=True
                     )
