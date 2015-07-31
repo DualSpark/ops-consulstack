@@ -97,8 +97,9 @@ class ConsulTemplate(Template):
 
         for index in range(len(self.azs)):
             name = 'ConsulHost%s' % (index + 1)
-            print "Creating instance {0}".format(name)
             #import pdb; pdb.set_trace()
+            print template.tropo_to_string(self)
+            print template.tropo_to_string(self.subnets['private'][index])
             print "Configuring {0} with security group {1}".format(name, consul_security_group)
             print "Configuring {0} with security group {1}".format(name, self.common_security_group)
             consul_host = self.add_resource(ec2.Instance(
@@ -117,7 +118,7 @@ class ConsulTemplate(Template):
                     )
                 ],
 
-                Tags=Tags(Name=name)
+                Tags=Tags(Name=name, StackName=self.name)
 
             ))
 
@@ -127,39 +128,35 @@ class ConsulTemplate(Template):
             VpcId=Ref(self.vpc_id),
             SecurityGroupEgress=[
                 ec2.SecurityGroupRule(
-                    IpProtocol='tcp', FromPort=p, ToPort=p, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
                 for p in [53, 80, 443, 8400, 8500, 8600]
             ] + [ec2.SecurityGroupRule(
-                    IpProtocol=p, FromPort=8300, ToPort=8302, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
                 )
                 for p in ['tcp', 'udp']
             ] + [ec2.SecurityGroupRule(
-                    IpProtocol='udp', FromPort=p, ToPort=p, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
                 for p in [53, 8400, 8500, 8600]
             ],
             SecurityGroupIngress= [ec2.SecurityGroupRule(
-                    IpProtocol='tcp', FromPort=p, ToPort=p, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
                 for p in [22, 53, 8400, 8500, 8600]
             ] + [
                 ec2.SecurityGroupRule(
-                    IpProtocol=p, FromPort=8300, ToPort=8302, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
                 )
                 for p in ['tcp', 'udp']
             ] + [
                 ec2.SecurityGroupRule(
-                    IpProtocol='udp', FromPort=p, ToPort=p, 
-                    SourceSecurityGroupId=Ref(self.common_security_group)
+                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
                 for p in [53, 8400, 8500, 8600]
-            ]
+            ],
+            Tags=Tags(StackName=self.name)
+
         ))
 
 
