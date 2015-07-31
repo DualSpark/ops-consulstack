@@ -94,6 +94,8 @@ class ConsulTemplate(Template):
 
         #t_config = self.config.get('template')
         consul_security_group = self.create_consul_sg()
+        startup_vars = []
+        startup_vars.append(Join('=', ['REGION', Ref('AWS::Region')]))
 
         for index in range(len(self.azs)):
             name = 'ConsulHost%s' % (index + 1)
@@ -108,6 +110,8 @@ class ConsulTemplate(Template):
                 KeyName=Ref(self.parameters['ec2Key']),
                 ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.ami_id),
                 #SecurityGroups=[Ref(consul_security_group)],
+                UserData=self.build_bootstrap([ConsulTemplate.BOOTSTRAP_SH], variable_declarations=startup_vars),
+
                 NetworkInterfaces=[
                     ec2.NetworkInterfaceProperty(
                         Description='ENI for CONSUL hosts',
@@ -130,7 +134,7 @@ class ConsulTemplate(Template):
                 ec2.SecurityGroupRule(
                     IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
-                for p in [53, 80, 443, 8400, 8500, 8600]
+                for p in [53, 8400, 8500, 8600]
             ] + [ec2.SecurityGroupRule(
                     IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
                 )
@@ -139,6 +143,10 @@ class ConsulTemplate(Template):
                     IpProtocol='udp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
                 for p in [53, 8400, 8500, 8600]
+            ] + [ec2.SecurityGroupRule(
+                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="0.0.0.0/0"
+                )
+                for p in [80,443]
             ],
             SecurityGroupIngress= [ec2.SecurityGroupRule(
                     IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
