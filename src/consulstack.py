@@ -104,6 +104,8 @@ class ConsulTemplate(Template):
             print template.tropo_to_string(self.subnets['private'][index])
             print "Configuring {0} with security group {1}".format(name, consul_security_group)
             print "Configuring {0} with security group {1}".format(name, self.common_security_group)
+            private_ip = '10.0.%s.4' % (16 + 16 * index)
+
             consul_host = self.add_resource(ec2.Instance(
                 name,
                 InstanceType="m1.small",
@@ -117,6 +119,7 @@ class ConsulTemplate(Template):
                         Description='ENI for CONSUL hosts',
                         GroupSet=[Ref(consul_security_group)],
                         SubnetId=self.subnets['private'][index],
+                        PrivateIpAddress=private_ip,
                         DeviceIndex=0,
                         DeleteOnTermination=True
                     )
@@ -166,7 +169,6 @@ class ConsulTemplate(Template):
             Tags=Tags(StackName=self.name)
 
         ))
-
 
 
 class ConsulStackController(NetworkBase):
