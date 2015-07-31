@@ -42,33 +42,29 @@ class ConsulTemplate(Template):
     # Load USER_DATA scripts from package
     BOOTSTRAP_SH = resources.get_resource('consul_bootstrap.sh', __name__)
 
-    # default configuration values
-    DEFAULT_CONFIG = {
-        'consul': {
+    # When no config.json file exists a new one is created using the 'factory default' file.  This function
+    # augments the factory default before it is written to file with the config values required by an ConsulTemplate
+    @staticmethod
+    def get_factory_defaults():
+        return {'consul': {
             'ami_id': 'ubuntu1404LtsAmiId',
-        }
-    }
+        }}
 
-
-    # schema of expected types for config values
-    CONFIG_SCHEMA = {
-        # 'network': {
-        #     'az_count': 'int',
-        #     'public_subnet_count': 'int',
-        #     'private_subnet_count': 'int'
-        # },
-        'consul': {
+    # When the user request to 'create' a new ELK template the config.json file is read in. This file is checked to
+    # ensure all required values are present. Because ELK stack has additional requirements beyond that of
+    # EnvironmentBase this function is used to add additional validation checks.
+    @staticmethod
+    def get_config_schema():
+        return {'consul': {
             'ami_id': 'str'
-
-        }
-    }
-
+        }}
 
     # Collect all the values we need to assemble our ELK stack
     def __init__(self, env_name, ami_id):
         super(ConsulTemplate, self).__init__('ConsulStack')
         self.env_name = env_name
         self.ami_id = ami_id
+
     # Called after add_child_template() has attached common parameters and some instance attributes:
     # - RegionMap: Region to AMI map, allows template to be deployed in different regions without updating AMI ids
     # - ec2Key: keyname to use for ssh authentication
@@ -173,22 +169,10 @@ class ConsulStackController(NetworkBase):
     """
     Coordinates CONSUL stack actions (create and deploy)
     """
-    #import pdb; pdb.set_trace()
-    # When no config.json file exists a new one is created using the 'factory default' file.  This function
-    # augments the factory default before it is written to file with the config values required by an ConsulTemplate
-    @staticmethod
-    def get_factory_defaults_hook():
-        return ConsulTemplate.DEFAULT_CONFIG
 
-    # When the user request to 'create' a new ELK template the config.json file is read in. This file is checked to
-    # ensure all required values are present. Because ELK stack has additional requirements beyond that of
-    # EnvironmentBase this function is used to add additional validation checks.
-    @staticmethod
-    def get_config_schema_hook():
-        return ConsulTemplate.CONFIG_SCHEMA
-
-    # def get_config_network_hook():
-    #     return ConsulTemplate.NETWORK_CONFIG
+    def __init__(self, *args, **kwargs):
+        self.add_config_handler(ConsulTemplate)
+        super(ConsulStackController, self).__init__(*args, **kwargs)
 
     def create_action(self):
         self.initialize_template()
