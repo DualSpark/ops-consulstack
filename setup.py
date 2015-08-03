@@ -4,7 +4,7 @@ setup(
     name="consulstack",
     version="0.1",
     install_requires=[
-        'cfn-environment-base==0.5.1'
+        'cfn-environment-base==0.6.0'
     ],
     dependency_links=[
         'https://github.com/DualSpark/cloudformation-environmentbase/archive/0.5.1.zip#egg=cfn-environment-base-0.5.1'

@@ -20,7 +20,7 @@ from environmentbase.cli import CLI
 from environmentbase.template import Template
 from environmentbase import template
 from troposphere import ec2, Tags, Ref, iam, GetAtt, Join, FindInMap, Output, \
-    Select
+    Select, Base64, cloudformation
 from troposphere.ec2 import NetworkInterfaceProperty
 from troposphere.sqs import Queue
 from troposphere.autoscaling import Tag
@@ -36,13 +36,9 @@ import template_utils as utils
 
 
 class ConsulTemplate(Template):
-    """
-    Enhances basic template by adding elasticsearch, 
-    kibana and logstash services.
-    """
 
     # Load USER_DATA scripts from package
-    BOOTSTRAP_SH = resources.get_resource('consul_bootstrap.sh', __name__)
+    #BOOTSTRAP_SH = resources.get_resource('consul_bootstrap.sh', __name__)
 
     # default configuration values
     DEFAULT_CONFIG = {
@@ -104,31 +100,14 @@ class ConsulTemplate(Template):
         startup_vars.append(Join('=', ['CONFIG', '/etc/consul']))
         startup_vars.append(Join('=', ['AZOUNT', len(self.azs)]))
 
-
-        # lines = ""
-        # with open('templates/consul.json') as infile:
-        #     for line in infile:
-        #         lines += line
-
-
-        # with open('templates/consul.json') as data_file:    
-        #     data = json.load(data_file)
-
-        # data['data_dir'] = '/var/consul/data'
-        # data['ui_dir'] = '/var/consul/ui'
-        # data['datacenter'] = Ref('AWS::Region')
-        # data['bootstrap_expect'] = len(self.azs)
-        # data['start_join'] = []
-
         for index in range(len(self.azs)):
             name = 'ConsulHost%s' % (index + 1)
-            #import pdb; pdb.set_trace()
             # print template.tropo_to_string(self)
             # print template.tropo_to_string(self.subnets['private'][index])
             # print "Configuring {0} with security group {1}".format(name, consul_security_group)
             # print "Configuring {0} with security group {1}".format(name, self.common_security_group)
-            private_ip = '10.0.%s.4' % (16 + 16 * index)
-            startup_vars.append(Join('=', ['IP', private_ip]))
+            # private_ip = '10.0.%s.4' % (16 + 16 * index)
+            #startup_vars.append(Join('=', ['IP', private_ip]))
 
             # if(index == 0):
             #     startup_vars.append(Join('=', ['BOOTSTRAP', json.dumps(data)]))
@@ -142,19 +121,32 @@ class ConsulTemplate(Template):
                 KeyName=Ref(self.parameters['ec2Key']),
                 ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.ami_id),
                 #SecurityGroups=[Ref(consul_security_group)],
-                UserData=self.build_bootstrap([ConsulTemplate.BOOTSTRAP_SH], variable_declarations=startup_vars),
+                #UserData=self.build_bootstrap([ConsulTemplate.BOOTSTRAP_SH], variable_declarations=startup_vars),
 
                 NetworkInterfaces=[
                     ec2.NetworkInterfaceProperty(
                         Description='ENI for CONSUL hosts',
                         GroupSet=[Ref(consul_security_group)],
                         SubnetId=self.subnets['private'][index],
-                        PrivateIpAddress=private_ip,
                         DeviceIndex=0,
                         DeleteOnTermination=True
                     )
                 ],
-
+                UserData=Base64(Join('', [
+                    '#!/bin/bash\n',
+                    'sudo apt-get update\n',
+                    'sudo apt-get -y install python-setuptools\n',
+                    'sudo apt-get -y install python-pip\n',
+                    'sudo apt-get -y install unzip\n',
+                    'sudo apt-get -y install dnsmasq\n',
+                    'sudo wget -P /root https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n',
+                    'sudo mkdir -p /root/aws-cfn-bootstrap-latest\n',
+                    'sudo tar xvfz /root/aws-cfn-bootstrap-latest.tar.gz ',
+                    '--strip-components=1 -C /root/aws-cfn-bootstrap-latest\n',
+                    'sudo easy_install /root/aws-cfn-bootstrap-latest/\n',                    
+                    'sudo cfn-init -s \'', Ref('AWS::StackName'),
+                    '\' -r Ec2Instance -c ascending --region \'', Ref('AWS::Region'), '\'\n\n'
+                ])),
                 Tags=Tags(Name=name, StackName=self.name)
             ))
 
@@ -226,12 +218,13 @@ class ConsulStackController(NetworkBase):
         self.initialize_template()
         self.construct_network()
         self.add_child_template(bastion.Bastion())
-        #consul_config = self.config.get('consul')
+        consul_config = self.config.get('consul')
         env_name = self.globals.get('environment_name', 'environmentbase-consul')
-        #consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
+        #import pdb; pdb.set_trace()
+        consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
         #self.validate_cloudformation_template(self.to_json())
 
-        #self.add_child_template(consul_template)
+        self.add_child_template(consul_template)
         self.write_template_to_file()
 
 

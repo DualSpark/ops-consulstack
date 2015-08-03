@@ -1,6 +1,9 @@
 #sudo apt-get -y update
-sudo apt-get -y install unzip dnsmasq
+#sudo apt-get -y install unzip dnsmasq
 
+#sudo apt-get -y install python-setuptools
+#sudo apt-get -y install python-pip
+sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
 
 sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip
 sudo wget -O /tmp/consul-ui.zip https://dl.bintray.com/mitchellh/consul/0.5.2_web_ui.zip
@@ -12,6 +15,11 @@ sudo mkdir -p /var/consul/ui
 
 sudo unzip -n -d /bin /tmp/consul.zip
 sudo unzip -n -d /var/consul/ui /tmp/consul-ui.zip
+
+
+
+cfn-init -s   -r Ec2Instance -c ascending
+
 
 
 
