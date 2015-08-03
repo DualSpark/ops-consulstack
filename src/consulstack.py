@@ -25,6 +25,8 @@ from troposphere.ec2 import NetworkInterfaceProperty
 from troposphere.sqs import Queue
 from troposphere.autoscaling import Tag
 import boto.vpc
+import json
+from pprint import pprint
 import boto
 import troposphere.autoscaling as autoscaling
 import troposphere.elasticloadbalancing as elb
@@ -96,15 +98,43 @@ class ConsulTemplate(Template):
         consul_security_group = self.create_consul_sg()
         startup_vars = []
         startup_vars.append(Join('=', ['REGION', Ref('AWS::Region')]))
+        startup_vars.append(Join('=', ['UI', '/var/consul/ui']))
+        startup_vars.append(Join('=', ['DATA', '/var/consul/data']))
+        startup_vars.append(Join('=', ['JOIN', '"10.0.16.4"']))
+        startup_vars.append(Join('=', ['CONFIG', '/etc/consul']))
+        startup_vars.append(Join('=', ['AZOUNT', len(self.azs)]))
+
+
+        # lines = ""
+        # with open('templates/consul.json') as infile:
+        #     for line in infile:
+        #         lines += line
+
+
+        # with open('templates/consul.json') as data_file:    
+        #     data = json.load(data_file)
+
+        # data['data_dir'] = '/var/consul/data'
+        # data['ui_dir'] = '/var/consul/ui'
+        # data['datacenter'] = Ref('AWS::Region')
+        # data['bootstrap_expect'] = len(self.azs)
+        # data['start_join'] = []
 
         for index in range(len(self.azs)):
             name = 'ConsulHost%s' % (index + 1)
             #import pdb; pdb.set_trace()
-            print template.tropo_to_string(self)
-            print template.tropo_to_string(self.subnets['private'][index])
-            print "Configuring {0} with security group {1}".format(name, consul_security_group)
-            print "Configuring {0} with security group {1}".format(name, self.common_security_group)
+            # print template.tropo_to_string(self)
+            # print template.tropo_to_string(self.subnets['private'][index])
+            # print "Configuring {0} with security group {1}".format(name, consul_security_group)
+            # print "Configuring {0} with security group {1}".format(name, self.common_security_group)
             private_ip = '10.0.%s.4' % (16 + 16 * index)
+            startup_vars.append(Join('=', ['IP', private_ip]))
+
+            # if(index == 0):
+            #     startup_vars.append(Join('=', ['BOOTSTRAP', json.dumps(data)]))
+            # else:
+            #     data['start_join'].append(private_ip)
+            #     startup_vars.append(Join('=', ['SERVER', json.dumps(data)]))
 
             consul_host = self.add_resource(ec2.Instance(
                 name,
@@ -126,8 +156,8 @@ class ConsulTemplate(Template):
                 ],
 
                 Tags=Tags(Name=name, StackName=self.name)
-
             ))
+
 
     def create_consul_sg(self):
         return self.add_resource(ec2.SecurityGroup('ConsulSecurityGroup',
@@ -196,12 +226,12 @@ class ConsulStackController(NetworkBase):
         self.initialize_template()
         self.construct_network()
         self.add_child_template(bastion.Bastion())
-        consul_config = self.config.get('consul')
+        #consul_config = self.config.get('consul')
         env_name = self.globals.get('environment_name', 'environmentbase-consul')
-        consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
-       # self.validate_cloudformation_template(self.to_json())
+        #consul_template = ConsulTemplate(env_name, consul_config.get('ami_id'))
+        #self.validate_cloudformation_template(self.to_json())
 
-        self.add_child_template(consul_template)
+        #self.add_child_template(consul_template)
         self.write_template_to_file()
 
 

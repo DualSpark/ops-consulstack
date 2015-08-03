@@ -1,10 +1,6 @@
 {
-    {% if not consul_join %}
     "bootstrap_expect": 3,
-    {% endif %}
-    {% if consul_join %}
     "start_join": ["{{ consul_join }}"],
-    {% endif %}
     "server": true,
     "rejoin_after_leave": true,
     "enable_syslog": true,
