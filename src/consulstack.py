@@ -129,17 +129,26 @@ class ConsulTemplate(Template):
             json_data['start_join'] = p_ids
             json_data['data_dir'] = '/var/consul/data'
             json_data['ui_dir'] = '/var/consul/ui'
-            json_data['datacenter'] = "{0}-{1}".format('us-west-2',name)
-
+            json_data['datacenter'] = 'us-west-2'
+            json_data['encrypt'] = 'Z+QYrQRxLf/RgFL64dnCNA=='
 
             if(index == 0):
                 json_data['bootstrap_expect'] = len(self.azs)
                 if(json_data.get('start_join')):
                     del json_data['start_join']
+
             else:
+                ohosts = []
                 if(json_data.get('bootstrap_expect')):
                     del json_data['bootstrap_expect']
+                for i in p_ids:
+                    if(i == p_ids[index]):
+                        continue
+                    else:
+                        ohosts.append(i)
+                json_data['start_join'] = ohosts
 
+            print json.dumps(json_data).strip()
             pprint(json_data)
             # pprint(boto_config.get('region_name', 'us-west-2'))
             # region = template.tropo_to_string(Ref('AWS::Region'))
@@ -181,25 +190,26 @@ class ConsulTemplate(Template):
                     #'sudo cfn-init -s \'', Ref('AWS::StackName'),
                     #'\' -r Ec2Instance -c ascending --region \'',
                     #Ref('AWS::Region'),
-                    'sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
-                    'sudo wget -O /tmp/consul-ui.zip https://dl.bintray.com/mitchellh/consul/0.5.2_web_ui.zip\n',
-                    'sudo unzip -n -d /bin /tmp/consul.zip\n',
-                    'sudo unzip -n -d /var/consul/ui /tmp/consul-ui.zip\n',
-
-                    '\n\n',
-                    'sudo cat > /etc/consul/consul.json << EOM\n',
-                    json.dumps(json_data),
-                    '\nEOM\n',
                     'sudo mkdir -p /var/consul\n',
                     'sudo mkdir -p /var/consul/ui\n',
                     'sudo mkdir -p /var/consul/data\n',
                     'sudo mkdir -p /etc/consul\n',
+
+                    'sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
+                    'sudo wget -O /tmp/consul-ui.zip https://dl.bintray.com/mitchellh/consul/0.5.2_web_ui.zip\n',
+                    'sudo unzip -n -d /bin /tmp/consul.zip\n',
+                    'sudo unzip -n -d /var/consul/ui /tmp/consul-ui.zip\n',
+                    '\n\n',
+                    'sudo cat > /etc/consul/consul.json << EOM\n',
+                    json.dumps(json_data).strip(),
+                    '\nEOM\n',
                     'sudo cat > /etc/init/consul-server.conf << EOM\n'
                     'description "Consul server service"\n',
                     'start on runlevel [2345]\n',
                     'stop on runlevel [06]\n\n',
-                    'exec consul agent -config-dir=/etc/consul\n'
-                    '\nEOM\n'
+                    'exec consul agent -server -data-dir=/var/consul/data -config-dir=/etc/consul\n'
+                    '\nEOM\n',
+                    'sudo service consul-server start\n\n'
                 ])),
 
                 #self.build_bootstrap([ConsulTemplate.BOOTSTRAP_SH], variable_declarations=startup_vars),
