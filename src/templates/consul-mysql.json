@@ -1,0 +1,10 @@
+{
+  "service": {
+    "name": "mysql",
+    "port": 3306,
+    "check": {
+      "script": "mysqladmin ping > /dev/null 2>&1",
+      "interval": "10s"
+    }
+  }
+}
