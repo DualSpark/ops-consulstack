@@ -1,0 +1,9 @@
+{
+    "server": false,
+    "rejoin_after_leave": true,
+    "enable_syslog": true,
+    "data_dir": "",
+    "ui_dir": "",
+    "datacenter": "",
+    "recursor": "10.0.0.2"
+}

@@ -33,7 +33,8 @@
         "natAmiId": "ami-69ae8259",
         "centOS65AmiId": "ami-b6bdde86",
         "ubuntu1404LtsAmiId": "ami-6ac2a85a",
-        "amazonLinuxAmiId": "ami-e7527ed7"
+        "amazonLinuxAmiId": "ami-e7527ed7",
+        "sampleServiceAmiId": "ami-01035931"
     },
     "us-west-1": {
         "natAmiId": "ami-1d2b2958",
