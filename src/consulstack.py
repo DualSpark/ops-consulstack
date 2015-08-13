@@ -21,6 +21,7 @@ from environmentbase.template import Template
 from environmentbase import template
 from troposphere import ec2, Tags, Ref, iam, GetAtt, Join, \
 Select, Base64, FindInMap, Output
+from troposphere.cloudformation import WaitCondition, WaitConditionHandle
 import boto.vpc
 import boto
 import json
@@ -37,23 +38,40 @@ class ConsulTemplate(Template):
     def get_factory_defaults():
         return {'consul': {
             's_ami_id': 'ubuntu1404LtsAmiId',
-            'a_ami_id': 'sampleServiceAmiId'
-        }}
+            'a_ami_id': 'ubuntu1404LtsAmiId',
+            'service_ami_id': 'ubuntu1404LtsAmiId',
+
+            },
+            'atlas': {
+                'atlas-username': '',
+                'atlas-token': '',
+
+            }
+        }
 
     @staticmethod
     def get_config_schema():
         return {'consul': {
             's_ami_id': 'str',
-            'a_ami_id': 'str'
-        }}
+            'a_ami_id': 'str',
+            'service_ami_id': 'str',
+
+            },
+            'atlas': {
+                'atlas-username': 'str',
+                'atlas-token': 'str',
+
+            }
+        }
 
     # Collect all the values we need to assemble our Consul.io stack
-    def __init__(self, env_name, s_ami_id, a_ami_id, boto_config={}):
-        super(ConsulTemplate, self).__init__('ConsulStack')
+    def __init__(self, env_name, s_ami_id, a_ami_id, boto_config={}, atlas_config={}):
+        super(ConsulTemplate, self).__init__('Consul')
         self.env_name = env_name
         self.s_ami_id = s_ami_id
         self.a_ami_id = a_ami_id
         self.boto_config = boto_config
+        self.atlas_config = atlas_config
     # Called after add_child_template() has attached common parameters and some instance attributes:
     # - RegionMap: Region to AMI map, allows template to be deployed in different regions without updating AMI ids
     # - ec2Key: keyname to use for ssh authentication
@@ -96,6 +114,19 @@ class ConsulTemplate(Template):
         with open('templates/consul.json') as json_file:
             json_data = json.load(json_file)
 
+        #Grab our consul.conf file to distribute to nodes
+        with open('templates/consul-mysql.json') as json_file:
+            d_json_data = json.load(json_file)
+        with open('templates/consul-web.json') as json_file:
+            w_json_data = json.load(json_file)
+        with open('templates/ping.json') as json_file:
+            p_json_data = json.load(json_file)
+
+
+        atlas_username = ''
+        atlas_token = ''
+
+
 
         #Loop over the AZs for our region
         for index in range(len(self.azs)):
@@ -119,6 +150,12 @@ class ConsulTemplate(Template):
                 json_data['bootstrap_expect'] = len(self.azs)
                 if(json_data.get('start_join')):
                     del json_data['start_join']
+                consul_ec2_name = 'consulclusterserverleader'
+                #import pdb; pdb.set_trace()
+                if(self.atlas_config.get('atlas-username')):
+                    atlas_username = "-atlas %s " % self.atlas_config.get('atlas-username')
+                    if(self.atlas_config.get('atlas-token')):
+                        atlas_token = "-atlas-token %s " % self.atlas_config.get('atlas-token')
 
             #This is reg node in the cluster
             #Remove bootstrap config
@@ -133,10 +170,11 @@ class ConsulTemplate(Template):
                     else:
                         ohosts.append(i)
                 json_data['start_join'] = ohosts
+                consul_ec2_name = 'consulclusterserver%s' % index
 
 
             consul_host = self.add_resource(ec2.Instance(
-                cname,
+                consul_ec2_name,
                 InstanceType="m1.small",
                 KeyName=Ref(self.parameters['ec2Key']),
                 ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.s_ami_id),
@@ -159,30 +197,40 @@ class ConsulTemplate(Template):
                     'sudo mkdir -p /var/consul/ui\n',
                     'sudo mkdir -p /var/consul/data\n',
                     'sudo mkdir -p /etc/consul\n',
+                    # 'sudo hostnamectl set-hostname ',
+                    # consul_ec2_name,
+                    # '\n',
                     'sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
                     'sudo wget -O /tmp/consul-ui.zip https://dl.bintray.com/mitchellh/consul/0.5.2_web_ui.zip\n',
                     'sudo unzip -n -d /bin /tmp/consul.zip\n',
                     'sudo unzip -n -d /var/consul/ui /tmp/consul-ui.zip\n',
                     '\n\n',
                     'sudo cat > /etc/consul/consul.json << EOM\n',
-                    json.dumps(json_data).strip(),
+                    json.dumps(json_data, indent=4, sort_keys=True).strip(),
                     '\nEOM\n',
                     'sudo cat > /etc/init/consul-server.conf << EOM\n'
                     'description "Consul server service"\n',
                     'start on (local-filesystems and net-device-up IFACE=eth0)\n',
                     'stop on runlevel [!12345]\n\n',
                     'respawn\n\n',
-                    'exec consul agent -server -config-dir=/etc/consul -atlas louissimps/consul ',
-                    '-atlas-token tHBDcVy0rmG2yg.atlasv1.zhXARgdb1N4RznU56mCrFrVkKwhEyP9E1QLVUiwa3dl',
-                    '8Pa4311MlSkT2jqZ5ckebJws\n',
+                    'exec consul agent -server -config-dir=/etc/consul ',
+                    atlas_username,
+                    atlas_token,
                     '\nEOM\n',
+                    'export GOMAXPROCS=`nproc`\n',
                     'sudo service consul-server start\n\n'
                 ])),
 
 
-                Tags=Tags(Name=cname, StackName=self.name)
+                Tags=Tags(Name=consul_ec2_name, StackName=self.name)
 
             ))
+
+
+            if(index == 0):
+                consul_cluster_leader = consul_host
+
+
 
             json_data['start_join'] = [p_ids[index]]
 
@@ -191,13 +239,14 @@ class ConsulTemplate(Template):
 
             json_data["server"] = False
 
-            sample_service = self.add_resource(ec2.Instance(
-                lname,
+            consul_client = self.add_resource(ec2.Instance(
+                'consulclient%s' % index,
                 InstanceType="m1.small",
                 KeyName=Ref(self.parameters['ec2Key']),
                 SubnetId=self.subnets['private'][index],
                 SecurityGroupIds=[Ref(consul_security_group)],
                 ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.a_ami_id),
+                DependsOn=consul_ec2_name,
                 UserData=Base64(Join('', [
                     '#!/bin/bash\n\n',
                     'sudo apt-get update\n',
@@ -205,11 +254,20 @@ class ConsulTemplate(Template):
                     'sudo mkdir -p /var/consul\n',
                     'sudo mkdir -p /var/consul/data\n',
                     'sudo mkdir -p /etc/consul\n',
+                    # 'sudo hostnamectl set-hostname ',
+                    # 'consulclient%s' % index,
+                    '\n',
                     'sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
                     'sudo unzip -n -d /bin /tmp/consul.zip\n',
                     '\n\n',
                     'sudo cat > /etc/consul/consul.json << EOM\n',
-                    json.dumps(json_data).strip(),
+                    json.dumps(json_data, indent=4, sort_keys=True).strip(),
+                    '\nEOM\n',
+                    'sudo cat > /etc/consul/consul-mysql.json << EOM\n',
+                    json.dumps(d_json_data, indent=4, sort_keys=True).strip(),
+                    '\nEOM\n',
+                    'sudo cat > /etc/consul/consul-web.json << EOM\n',
+                    json.dumps(w_json_data, indent=4, sort_keys=True).strip(),
                     '\nEOM\n',
                     'sudo cat > /etc/init/consul-agent.conf << EOM\n'
                     'description "Consul agent service"\n',
@@ -218,14 +276,27 @@ class ConsulTemplate(Template):
                     'respawn\n\n',
                     'exec consul agent -data-dir=/var/consul/data -config-dir=/etc/consul\n'
                     '\nEOM\n',
+                    'export GOMAXPROCS=`nproc`\n',
                     'sudo service consul-agent start\n\n',
 
                 ])),
 
 
-                Tags=Tags(Name=lname, StackName=self.name)
+                Tags=Tags(Name='consulclient%s' % index, StackName=self.name)
 
             ))
+
+
+
+        self.add_output([
+            Output(
+                "ConsulClusterLeader",
+                Description="Consul Cluster Leader IP",
+                Value=GetAtt(consul_cluster_leader, 'PrivateIp'),
+                )
+            ])
+
+
 
 
     def create_consul_sg(self):
@@ -236,7 +307,7 @@ class ConsulTemplate(Template):
                 ec2.SecurityGroupRule(
                     IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
                 )
-                for p in [22, 53, 8400, 8500, 8600]
+                for p in [22, 53, 7223, 8400, 8500, 8600]
             ] + [ec2.SecurityGroupRule(
                     IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
                 )
@@ -248,7 +319,7 @@ class ConsulTemplate(Template):
             ] + [ec2.SecurityGroupRule(
                     IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="0.0.0.0/0"
                 )
-                for p in [80,443]
+                for p in [80,443, 7223]
             ],
             SecurityGroupIngress= [ec2.SecurityGroupRule(
                     IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
@@ -297,8 +368,9 @@ class ConsulStackController(NetworkBase):
         self.construct_network()
         self.add_child_template(bastion.Bastion())
         consul_config = self.config.get('consul')
+        atlas_config = self.config.get('atlas')
         env_name = self.globals.get('environment_name', 'environmentbase-consul')
-        consul_template = ConsulTemplate(env_name, consul_config.get('s_ami_id'), consul_config.get('a_ami_id'), boto_config=self.config.get('boto'))
+        consul_template = ConsulTemplate(env_name, consul_config.get('s_ami_id'), consul_config.get('a_ami_id'), boto_config=self.config.get('boto'), atlas_config=self.config.get('atlas'))
         self.add_child_template(consul_template)
         self.write_template_to_file()
 

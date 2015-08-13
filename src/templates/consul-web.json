@@ -6,7 +6,7 @@
 		"port": 80,
   		"check": 
   			{
-  				"script": "curl localhost >/dev/null 2>&1", "interval": "10s"
+  				"script": "/opt/bitnami/common/bin/curl localhost >/dev/null 2>&1", "interval": "10s"
   			}
 	}
 }
