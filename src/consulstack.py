@@ -39,12 +39,12 @@ class ConsulTemplate(Template):
         return {'consul': {
             's_ami_id': 'ubuntu1404LtsAmiId',
             'a_ami_id': 'ubuntu1404LtsAmiId',
-            'service_ami_id': 'ubuntu1404LtsAmiId',
+            'service_ami_id': 'ubuntu1404LtsAmiId'
 
             },
             'atlas': {
                 'atlas-username': '',
-                'atlas-token': '',
+                'atlas-token': ''
 
             }
         }
@@ -59,17 +59,17 @@ class ConsulTemplate(Template):
             },
             'atlas': {
                 'atlas-username': 'str',
-                'atlas-token': 'str',
+                'atlas-token': 'str'
 
             }
         }
 
     # Collect all the values we need to assemble our Consul.io stack
-    def __init__(self, env_name, s_ami_id, a_ami_id, boto_config={}, atlas_config={}):
+    def __init__(self, env_name, s_ami_id, service_ami_id, boto_config={}, atlas_config={}):
         super(ConsulTemplate, self).__init__('Consul')
         self.env_name = env_name
         self.s_ami_id = s_ami_id
-        self.a_ami_id = a_ami_id
+        self.service_ami_id = service_ami_id
         self.boto_config = boto_config
         self.atlas_config = atlas_config
     # Called after add_child_template() has attached common parameters and some instance attributes:
@@ -115,8 +115,8 @@ class ConsulTemplate(Template):
             json_data = json.load(json_file)
 
         #Grab our consul.conf file to distribute to nodes
-        with open('templates/consul-mysql.json') as json_file:
-            d_json_data = json.load(json_file)
+        #with open('templates/consul-mysql.json') as json_file:
+        #    d_json_data = json.load(json_file)
         with open('templates/consul-web.json') as json_file:
             w_json_data = json.load(json_file)
         with open('templates/ping.json') as json_file:
@@ -130,8 +130,6 @@ class ConsulTemplate(Template):
 
         #Loop over the AZs for our region
         for index in range(len(self.azs)):
-            cname = 'ConsulHost%s' % (index + 1)
-            lname = 'ExampleLampStack%s' % (index + 1)
 
             #Add in our consul defaults for the various configs we need
             #to write to our nodes
@@ -217,7 +215,6 @@ class ConsulTemplate(Template):
                     atlas_username,
                     atlas_token,
                     '\nEOM\n',
-                    'export GOMAXPROCS=`nproc`\n',
                     'sudo service consul-server start\n\n'
                 ])),
 
@@ -245,38 +242,34 @@ class ConsulTemplate(Template):
                 KeyName=Ref(self.parameters['ec2Key']),
                 SubnetId=self.subnets['private'][index],
                 SecurityGroupIds=[Ref(consul_security_group)],
-                ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.a_ami_id),
+                ImageId=FindInMap('RegionMap', Ref('AWS::Region'), self.service_ami_id),
                 DependsOn=consul_ec2_name,
                 UserData=Base64(Join('', [
                     '#!/bin/bash\n\n',
-                    'sudo apt-get update\n',
-                    'sudo apt-get -y install unzip\n',
-                    'sudo mkdir -p /var/consul\n',
-                    'sudo mkdir -p /var/consul/data\n',
-                    'sudo mkdir -p /etc/consul\n',
-                    # 'sudo hostnamectl set-hostname ',
-                    # 'consulclient%s' % index,
+                    'sudo apt-get -y update\n',
+                    'sudo apt-get -y install unzip nginx\n',
+                    'sudo service nginx start\n\n',
+                    # 'sudo apt-get -y install unzip\n',
+                    'mkdir -p /var/consul\n',
+                    'mkdir -p /var/consul/data\n',
+                    'mkdir -p /etc/consul\n',
                     '\n',
-                    'sudo wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
-                    'sudo unzip -n -d /bin /tmp/consul.zip\n',
+                    'wget -O /tmp/consul.zip https://dl.bintray.com/mitchellh/consul/0.5.2_linux_amd64.zip\n',
+                    'unzip -n -d /bin /tmp/consul.zip\n',
                     '\n\n',
-                    'sudo cat > /etc/consul/consul.json << EOM\n',
+                    'cat > /etc/consul/consul.json << EOM\n',
                     json.dumps(json_data, indent=4, sort_keys=True).strip(),
                     '\nEOM\n',
-                    'sudo cat > /etc/consul/consul-mysql.json << EOM\n',
-                    json.dumps(d_json_data, indent=4, sort_keys=True).strip(),
-                    '\nEOM\n',
-                    'sudo cat > /etc/consul/consul-web.json << EOM\n',
+                    'cat > /etc/consul/consul-web.json << EOM\n',
                     json.dumps(w_json_data, indent=4, sort_keys=True).strip(),
                     '\nEOM\n',
-                    'sudo cat > /etc/init/consul-agent.conf << EOM\n'
+                    'cat > /etc/init/consul-agent.conf << EOM\n'
                     'description "Consul agent service"\n',
                     'start on (local-filesystems and net-device-up IFACE=eth0)\n',
                     'stop on runlevel [!12345]\n\n',
                     'respawn\n\n',
                     'exec consul agent -data-dir=/var/consul/data -config-dir=/etc/consul\n'
                     '\nEOM\n',
-                    'export GOMAXPROCS=`nproc`\n',
                     'sudo service consul-agent start\n\n',
 
                 ])),
@@ -370,7 +363,8 @@ class ConsulStackController(NetworkBase):
         consul_config = self.config.get('consul')
         atlas_config = self.config.get('atlas')
         env_name = self.globals.get('environment_name', 'environmentbase-consul')
-        consul_template = ConsulTemplate(env_name, consul_config.get('s_ami_id'), consul_config.get('a_ami_id'), boto_config=self.config.get('boto'), atlas_config=self.config.get('atlas'))
+        consul_template = ConsulTemplate(env_name, consul_config.get('s_ami_id'), consul_config.get('service_ami_id'), boto_config=self.config.get('boto'), atlas_config=self.config.get('atlas'))
+
         self.add_child_template(consul_template)
         self.write_template_to_file()
 

@@ -3,7 +3,7 @@
     "name": "mysql",
     "port": 3306,
     "check": {
-      "script": "/opt/bitnami/mysql/bin/mysqladmin ping -u mysql -h localhost",
+      "script": "mysqladmin -h localhost -u mysql ping",
       "interval": "10s"
     }
   }
