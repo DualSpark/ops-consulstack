@@ -149,4 +149,3 @@ After integration, once you deploy the stack you can access your dashboard at:
 ```
 https://atlas.hashicorp.com/{atlas-username}/environments/{atlas-envname}
 ```
-
