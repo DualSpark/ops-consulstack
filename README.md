@@ -6,7 +6,7 @@
 ### Using a [Python virtual environment](http://docs.python-guide.org/en/latest/dev/virtualenvs/) to isolate dependencies:
 
 ```bash
-git clone git@github.com:dualspark/ops-consulstack
+git clone https://github.com/DualSpark/ops-consulstack.git
 cd ops-consulstack
 pip install virtualenvwrapper
 mkvirtualenv consulstack
@@ -14,6 +14,10 @@ python setup.py develop
 ```
 
 When working on this project in the future, use `workon consulstack` to activate the configured environment and `deactivate` when you're finished.
+```bash
+deactivate
+```
+Note: This is only available after you run workon consulstack.
 
 ### Configuring AWS authentication
 
@@ -46,7 +50,8 @@ You need to [generate an EC2 Key Pair](http://docs.aws.amazon.com/AWSEC2/latest/
 Run the consulstack.py file:
 
 ```bash
-./src/consulstack.py create
+cd src
+python consulstack.py create
 ```
 
 This will gather information from your AWS account to know what regions and availability zones are available.  It will then create a default config.json file and a Cloudformation template named environmentbase.template.
@@ -64,8 +69,8 @@ This will gather information from your AWS account to know what regions and avai
 ### Running ops-consulstack
 
 ```bash
-./src/consulstack.py create
-./src/consulstack.py deploy
+python consulstack.py create
+python consulstack.py deploy
 ```
 
 ## What's created
@@ -78,21 +83,70 @@ A child Cloudformation stack is created for the Consul stack.  This allows more 
 "ConsulStack":{
 "Type":"AWS::CloudFormation::Stack",
 "Properties":{
-"TemplateURL":"https://BUCKETNAME.s3.amazonaws.com/devtools/cloudformation/ConsulStack.1438189565.template"
+"TemplateURL":"https://BUCKETNAME.s3.amazonaws.com/devtools/cloudformation/ConsulStack.{dynamic id}.template"
 ```
 
 ### Sample Agents
 
-Included in this repository I have created an agent node in each AZ. This has one web service running with health checks.
+Included in this repository I have created an agent node in each AZ. This has one web service running with health checks. Each sample node is running nginx as a standalone web server. The health checks are configured in the templates/ folder.
+
+consul-web.json
+```json
+{
+	"service": 
+	{
+		"name": "web", 
+		"tags": ["web"], 
+		"port": 80,
+  		"check": 
+  			{
+  				"script": "curl localhost >/dev/null 2>&1", "interval": "10s"
+  			}
+	}
+}
+```
+This registers a service named web with the agent. There is a sample mysql config file as well if your ami supports it.
+
+
+### Access Members
+
+You will need to ssh through your [Bastion host](https://github.com/DualSpark/cloudformation-environmentbase/blob/master/src/environmentbase/patterns/bastion.py) that was created as part of [Cloudformation EnvironmentBase](https://github.com/DualSpark/cloudformation-environmentbase)
+
+```bash
+ssh -A -i ~/path-to-ssh/key-you-specified-in-config.pem ubuntu@dns-aname-for-load-balancer
+```
+After connecting to the Bastion host you can then connect to your consul members.
+
+```bash
+ssh -A ubuntu@10.0.64.4
+```
+
+now run
+
+```bash
+consul members
+```
+You should a list of all connected nodes across Availability Zones. 
+
+
+
+
 
 ### Atlas Integration
 
 If you choose to Atlas integration. 
+You will need to set up an account at [Hashicorp](https://atlas.hashicorp.com/). You can read all about it on the [Consul.io](https://www.consul.io/docs/guides/atlas.html) site. In the config.json file that is created you can add the following 
+
+```json
+    "atlas": {
+        "atlas-token": "token-that-you-setup-earlier",
+        "atlas-username": "{username}/{envname}"
+    },
+```
+
+After integration, once you deploy the stack you can access your dashboard at:
+
 ```
 https://atlas.hashicorp.com/{atlas-username}/environments/{atlas-envname}
 ```
 
-
-### Access via Elastic Load Balancer URLs
-
-The Kibana ELB is outputted from the ELK Cloudformation stack.  Kibana can be accessed by using that URL on port 5601.

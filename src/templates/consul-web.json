@@ -2,7 +2,7 @@
 	"service": 
 	{
 		"name": "web", 
-		"tags": ["lamp"], 
+		"tags": ["web"], 
 		"port": 80,
   		"check": 
   			{
