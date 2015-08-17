@@ -92,7 +92,3 @@ If you choose to Atlas integration.
 https://atlas.hashicorp.com/{atlas-username}/environments/{atlas-envname}
 ```
 
-
-### Access via Elastic Load Balancer URLs
-
-The Kibana ELB is outputted from the ELK Cloudformation stack.  Kibana can be accessed by using that URL on port 5601.
