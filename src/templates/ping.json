@@ -1,8 +1,0 @@
-{
-	"check": 
-	{
-		"name": "ping", 
-  		"script": "/bin/ping -c1 google.com 2>/dev/null", 
-  		"interval": "30s"
-  	}
-} 
