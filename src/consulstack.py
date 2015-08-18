@@ -119,8 +119,8 @@ class ConsulTemplate(Template):
         #    d_json_data = json.load(json_file)
         with open('templates/consul-web.json') as json_file:
             w_json_data = json.load(json_file)
-        with open('templates/ping.json') as json_file:
-            p_json_data = json.load(json_file)
+        #with open('templates/ping.json') as json_file:
+        #    p_json_data = json.load(json_file)
 
 
         atlas_username = ''
