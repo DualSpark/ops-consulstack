@@ -1,7 +1,5 @@
 {
-    "bootstrap_expect": 3,
-    "start_join": [],
-    "server": true,
+    "server": false,
     "rejoin_after_leave": true,
     "enable_syslog": true,
     "data_dir": "",

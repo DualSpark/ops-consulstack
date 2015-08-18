@@ -1,0 +1,25 @@
+django==1.7
+gunicorn
+requests
+djangorestframework==3
+django-rest-swagger
+django-filter
+
+## dev requirements
+sphinx
+sphinx_rtd_theme
+mock
+responses
+ipdb
+ipython
+
+## Test and quality analysis
+
+pylint
+coverage
+django-jenkins
+django-extensions
+django-cors-headers
+
+## custom libs:
+-e git://github.com/TangentMicroServices/PythonAuthenticationLib.git#egg=tokenauth

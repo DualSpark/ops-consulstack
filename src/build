@@ -1,0 +1,3 @@
+#!/bin/bash
+python consulstack.py create --debug
+python consulstack.py deploy --debug
