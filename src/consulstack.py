@@ -72,6 +72,7 @@ class ConsulTemplate(Template):
         self.service_ami_id = service_ami_id
         self.boto_config = boto_config
         self.atlas_config = atlas_config
+
     # Called after add_child_template() has attached common parameters and some instance attributes:
     # - RegionMap: Region to AMI map, allows template to be deployed in different regions without updating AMI ids
     # - ec2Key: keyname to use for ssh authentication
@@ -91,7 +92,6 @@ class ConsulTemplate(Template):
     # - self.azs: List of parameter references
     def build_hook(self):
         self.create_consul_cluster()
-
 
     def create_consul_cluster(self):
 
@@ -298,15 +298,15 @@ class ConsulTemplate(Template):
             VpcId=Ref(self.vpc_id),
             SecurityGroupEgress=[
                 ec2.SecurityGroupRule(
-                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
+                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in [22, 53, 7223, 8400, 8500, 8600]
             ] + [ec2.SecurityGroupRule(
-                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
+                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in ['tcp', 'udp']
             ] + [ec2.SecurityGroupRule(
-                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
+                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in [53, 8400, 8500, 8600]
             ] + [ec2.SecurityGroupRule(
@@ -315,17 +315,17 @@ class ConsulTemplate(Template):
                 for p in [80,443, 7223]
             ],
             SecurityGroupIngress= [ec2.SecurityGroupRule(
-                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
+                    IpProtocol='tcp', FromPort=p, ToPort=p, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in [22, 80, 443, 53, 8400, 8500, 8600]
             ] + [
                 ec2.SecurityGroupRule(
-                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp="10.0.0.0/16"
+                    IpProtocol=p, FromPort=8300, ToPort=8302, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in ['tcp', 'udp']
             ] + [
                 ec2.SecurityGroupRule(
-                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp="10.0.0.0/16"
+                    IpProtocol='udp', FromPort=p, ToPort=p, CidrIp=Ref(self.vpc_cidr)
                 )
                 for p in [53, 8400, 8500, 8600]
             ],
@@ -350,8 +350,6 @@ class ConsulStackController(NetworkBase):
 
         self.add_child_template(consul_template)
         self.write_template_to_file()
-
-
 
     def validate_cloudformation_template(self, template_body):
         c = boto.connect_cloudformation()
