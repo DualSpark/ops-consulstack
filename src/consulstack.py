@@ -18,7 +18,7 @@ Options:
 from environmentbase.networkbase import NetworkBase
 from environmentbase.cli import CLI
 from environmentbase.template import Template
-from environmentbase import template
+from environmentbase.environmentbase import EnvConfig
 from troposphere import ec2, Tags, Ref, iam, GetAtt, Join, \
 Select, Base64, FindInMap, Output
 from troposphere.cloudformation import WaitCondition, WaitConditionHandle
@@ -334,27 +334,10 @@ class ConsulTemplate(Template):
         ))
 
 
-
 class ConsulStackController(NetworkBase):
     """
     Coordinates CONSUL stack actions (create and deploy)
     """
-    # When no config.json file exists a new one is created using the 'factory default' file.  This function
-    # augments the factory default before it is written to file with the config values required by an ConsulTemplate
-    @staticmethod
-    def get_factory_defaults_hook():
-        return ConsulTemplate.DEFAULT_CONFIG
-
-    # When the user request to 'create' a new ELK template the config.json file is read in. This file is checked to
-    # ensure all required values are present. Because ELK stack has additional requirements beyond that of
-    # EnvironmentBase this function is used to add additional validation checks.
-    @staticmethod
-    def get_config_schema_hook():
-        return ConsulTemplate.CONFIG_SCHEMA
-
-    def __init__(self, *args, **kwargs):
-        self.add_config_handler(ConsulTemplate)
-        super(ConsulStackController, self).__init__(*args, **kwargs)
 
     def create_action(self):
         self.initialize_template()
@@ -378,13 +361,13 @@ class ConsulStackController(NetworkBase):
             raise Exception(e.body)
 
 
-
 def main():
     # This cli object takes the documentation comment at the top of this file (__doc__) and parses it against the
     # command line arguments (sys.argv).  Supported commands are create and deploy. The deploy function works fine as
     # is. ConsulStackController overrides the create action to include an Consul.io stack as an additional template.
     cli = CLI(doc=__doc__)
-    ConsulStackController(view=cli)
+    env_config=EnvConfig( config_handlers=[ConsulTemplate])
+    ConsulStackController(view=cli, env_config=env_config)
 
 if __name__ == '__main__':
     main()
