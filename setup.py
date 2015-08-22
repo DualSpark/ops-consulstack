@@ -7,7 +7,7 @@ setup(
         'cfn-environment-base==0.6.0'
     ],
     dependency_links=[
-        'https://github.com/DualSpark/cloudformation-environmentbase/zipball/feature-0.6.0#egg=cfn-environment-base-0.6.0'
+        'https://github.com/DualSpark/cloudformation-environmentbase/zipball/0.6.0#egg=cfn-environment-base-0.6.0'
     ],
     package_dir={"": "src"},
     include_package_data=True,
